@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Feedback Triage: from customer tickets to a ranked roadmap</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#eef2f6;--card:#fff;--ink:#0e1c2b;--muted:#586a7c;--line:#dbe3ec;--accent:#2457e6;--accent-soft:#e3ebff;--on-accent:#fff;--neg:#c2410c;--neg-soft:#ffe9dd;--pos:#15803d;--pos-soft:#dcf5e5;--neu-soft:#e9eef4;--hero:#0e1c2b;--hero-ink:#fff;--hero-muted:#a9b8c9}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0a121b;--card:#121e2b;--ink:#e8eef5;--muted:#9fb0c2;--line:#25364a;--accent:#6f93ff;--accent-soft:#1b2c52;--on-accent:#081226;--neg:#ff9a6b;--neg-soft:#3a2216;--pos:#5fd18a;--pos-soft:#12301f;--neu-soft:#1a2a3a;--hero:#0d1a28}}
+:root[data-theme="dark"]{--bg:#0a121b;--card:#121e2b;--ink:#e8eef5;--muted:#9fb0c2;--line:#25364a;--accent:#6f93ff;--accent-soft:#1b2c52;--on-accent:#081226;--neg:#ff9a6b;--neg-soft:#3a2216;--pos:#5fd18a;--pos-soft:#12301f;--neu-soft:#1a2a3a;--hero:#0d1a28}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+.hero{background:var(--hero);color:var(--hero-ink);padding:26px 18px 0}
+.wrap{max-width:860px;margin:0 auto}
+.tag{display:inline-block;font-size:.82rem;font-weight:600;color:var(--hero-muted);border:1px solid #34465a;border-radius:999px;padding:3px 12px;margin-bottom:12px}
+h1{font-size:clamp(1.8rem,6vw,2.6rem);line-height:1.1;margin:0 0 10px;letter-spacing:-.02em;font-weight:800}
+.hero p{color:var(--hero-muted);max-width:60ch;margin:0 0 16px}
+.meta{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:.88rem;color:var(--hero-muted);margin-bottom:18px}
+.meta b{color:var(--hero-ink)}
+.tabs{display:flex;gap:4px}
+.tabs button{flex:0 0 auto;font:inherit;font-weight:700;color:var(--hero-muted);background:transparent;border:0;border-bottom:3px solid transparent;padding:12px 16px;cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--hero-ink);border-bottom-color:#6f93ff}
+button:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+main{max-width:860px;margin:0 auto;padding:20px 16px 56px}
+.panel[hidden]{display:none}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:16px}
+h2{font-size:1.1rem;margin:0 0 4px;letter-spacing:-.01em}
+.sub{color:var(--muted);font-size:.92rem;margin:0 0 12px}
+textarea{width:100%;min-height:190px;font:inherit;font-size:.95rem;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px;resize:vertical}
+.btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.btn{font:inherit;font-weight:700;border-radius:10px;padding:11px 18px;cursor:pointer;border:1px solid var(--accent);background:var(--accent);color:var(--on-accent)}
+.btn.ghost{background:transparent;color:var(--accent)}
+.kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px}
+@media(min-width:620px){.kpis{grid-template-columns:repeat(4,1fr)}}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+.kpi b{display:block;font-size:1.7rem;line-height:1.1;letter-spacing:-.02em}
+.kpi span{font-size:.85rem;color:var(--muted)}
+.bar{margin:14px 0}
+.bt{display:flex;justify-content:space-between;gap:8px;font-weight:600;font-size:.95rem}
+.track{height:12px;background:var(--neu-soft);border-radius:6px;margin:6px 0 3px;display:flex;overflow:hidden}
+.seg-n{background:var(--neg)}.seg-p{background:var(--accent)}
+.legend{font-size:.82rem;color:var(--muted);display:flex;gap:14px;margin-top:8px}
+.dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px}
+.chip{display:inline-block;font-size:.78rem;font-weight:700;border-radius:999px;padding:2px 10px;white-space:nowrap}
+.chip.theme{background:var(--accent-soft);color:var(--accent)}
+.chip.neg{background:var(--neg-soft);color:var(--neg)}.chip.pos{background:var(--pos-soft);color:var(--pos)}.chip.neu{background:var(--neu-soft);color:var(--muted)}
+.tk{display:flex;flex-direction:column;gap:6px;padding:11px 0;border-top:1px solid var(--line)}
+.tk:first-child{border-top:0}
+.tk .chips{display:flex;gap:6px;flex-wrap:wrap}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:540px;font-size:.92rem}
+th{text-align:left;color:var(--muted);font-weight:600;font-size:.82rem;padding:6px}
+td{padding:9px 6px;border-top:1px solid var(--line)}
+td.name{font-weight:700}
+select{font:inherit;font-size:.9rem;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:4px 6px}
+.rank{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--accent);color:var(--on-accent);font-weight:800;font-size:.8rem}
+.score{font-weight:800}
+.rec{background:var(--accent-soft);border-color:transparent}
+.rec h2{color:var(--accent)}
+.rec p{margin:0 0 8px;max-width:64ch}
+.grid2{display:grid;gap:12px}
+@media(min-width:620px){.grid2{grid-template-columns:1fr 1fr}}
+.cs h3{font-size:.98rem;margin:0 0 4px}
+.cs p,.cs li{color:var(--muted);font-size:.95rem;max-width:64ch}
+.cs ul{padding-left:18px;margin:0}
+.note{font-size:.88rem;color:var(--muted);border-left:3px solid var(--accent);padding-left:12px}
+</style>
+</head>
+<body>
+<header class="hero"><div class="wrap">
+<span class="tag">Product management project</span>
+<h1>Feedback Triage</h1>
+<p>Turns a pile of customer tickets into themes, then ranks what to fix first, so a product team spends its next sprint on the problem that matters most.</p>
+<div class="meta"><span>Designed by <b>Ayushi Chandgude</b></span><span>Built with AI assistance</span><span>Method: <b>RICE</b></span></div>
+<div class="tabs" role="tablist">
+<button role="tab" id="t1" aria-selected="true" aria-controls="p1">Live tool</button>
+<button role="tab" id="t2" aria-selected="false" aria-controls="p2">Case study</button>
+</div></div></header>
+<main>
+<section class="panel" id="p1" role="tabpanel" aria-labelledby="t1">
+<div class="card">
+<h2>1. Add tickets</h2>
+<p class="sub">One ticket per line. A sample batch is loaded; replace it with your own. Everything runs on your device.</p>
+<textarea id="inp" aria-label="Customer tickets, one per line"></textarea>
+<div class="btns"><button class="btn" id="go">Analyze tickets</button><button class="btn ghost" id="sample">Reset sample</button><button class="btn ghost" id="clear">Clear</button></div>
+</div>
+<div id="out" hidden>
+<div class="kpis" id="kpis"></div>
+<div class="card"><h2>2. Themes</h2><p class="sub">What customers talk about, and how negative each theme is.</p><div id="themes"></div>
+<div class="legend"><span><i class="dot seg-n"></i>Negative tickets</span><span><i class="dot seg-p"></i>Other tickets</span></div></div>
+<div class="card"><h2>3. Tagged tickets</h2><p class="sub">Each ticket with its theme and tone.</p><div id="tickets"></div></div>
+<div class="card"><h2>4. Priority ranking (RICE)</h2><p class="sub">Reach comes from your tickets. Change impact, confidence and effort; the ranking updates.</p>
+<div class="scroll"><table><thead><tr><th>Rank</th><th>Theme</th><th>Reach</th><th>Impact</th><th>Confidence</th><th>Effort</th><th>Score</th></tr></thead><tbody id="rice"></tbody></table></div>
+<p class="sub" style="margin:10px 0 0">Score = reach × impact × confidence ÷ effort.</p></div>
+<div class="card rec"><h2>5. Recommendation</h2><div id="rec"></div></div>
+</div>
+</section>
+<section class="panel cs" id="p2" role="tabpanel" aria-labelledby="t2" hidden>
+<div class="card"><h2>Problem</h2><p>Support teams read hundreds of tickets, but product teams rarely see them in a form they can act on. Without a ranking, the loudest complaint wins instead of the most important one.</p></div>
+<div class="grid2">
+<div class="card"><h3>Users</h3><p>Product managers and support leads who need a quick view of customer pain before planning a sprint.</p></div>
+<div class="card"><h3>Goal</h3><p>Go from a batch of raw tickets to a ranked list of fixes in minutes instead of hours.</p></div>
+<div class="card"><h3>Success metrics</h3><ul><li>Share of tickets tagged correctly</li><li>Time from ticket batch to ranked list</li></ul></div>
+<div class="card"><h3>Approach</h3><ul><li>Match each ticket to a theme with keyword rules</li><li>Score tone with a small word list</li><li>Rank themes with RICE, adjustable by the PM</li></ul></div>
+</div>
+<div class="card"><h3>Trade-offs and limits</h3><p>Keyword rules are fast and easy to explain, but they miss sarcasm and new wording. The PM stays in control: every impact, confidence and effort value can be changed, and the PM should read sample tickets before acting.</p></div>
+<div class="card"><h3>Next steps</h3><ul><li>Replace keyword rules with a trained text classifier</li><li>Let the PM correct wrong tags and learn from the corrections</li><li>Track themes week by week to see whether fixes work</li></ul></div>
+<p class="note">Designed by Ayushi Chandgude, drawing on customer-support experience. Built with AI assistance. Sample tickets are invented and contain no real customer data.</p>
+</section>
+</main>
+<script>
+var SAMPLE="My order arrived late again and the package was damaged\nI was charged twice and still waiting for my refund\nThe app crashes every time I open the tracking page\nCan’t log in, the password reset email never comes\nDelivery was two weeks late, very disappointing\nRefund took 3 weeks, terrible experience\nGreat support agent, solved my issue quickly, thank you\nThe app is slow and freezes on checkout\nToo expensive now, the subscription price went up\nLogin keeps failing after the latest update\nWrong item delivered and nobody replied to my email\nLove the new design, the app is easy to use now";
+var THEMES={"Delivery":["deliver","late","package","order","shipping","damaged","wrong item"],"Refunds and billing":["refund","charged","payment","billing","invoice"],"App performance":["crash","slow","freeze","bug","error","loading"],"Login and account":["log in","login","password","account","sign in"],"Pricing":["expensive","price","cost","subscription","cheaper"],"Support quality":["agent","support","reply","replied","response","service"],"Design and ease of use":["design","easy","interface","layout"]};
+var NEG=["late","damaged","crash","slow","freeze","fail","terrible","disappoint","wrong","expensive","never","can’t","can't","cannot","charged twice","nobody","waiting","took"];
+var POS=["great","love","thank","quickly","easy","good","happy"];
+var DEF={"Delivery":[3,.8,2],"Refunds and billing":[3,.8,2],"App performance":[2,.8,2],"Login and account":[3,.8,1],"Pricing":[2,.5,3],"Support quality":[2,.8,1],"Design and ease of use":[1,.8,1]};
+var S={};
+function $(i){return document.getElementById(i)}
+function h(tag,cls,txt){var e=document.createElement(tag);if(cls)e.className=cls;if(txt!==undefined)e.textContent=txt;return e}
+function classify(t){var s=t.toLowerCase(),b="Other",m=0;for(var k in THEMES){var n=0;THEMES[k].forEach(function(w){if(s.indexOf(w)>-1)n++});if(n>m){m=n;b=k}}return b}
+function tone(t){var s=t.toLowerCase(),n=0;NEG.forEach(function(w){if(s.indexOf(w)>-1)n--});POS.forEach(function(w){if(s.indexOf(w)>-1)n++});return n<0?"neg":n>0?"pos":"neu"}
+function analyze(){
+ var L=$("inp").value.split("\n").map(function(x){return x.trim()}).filter(Boolean);
+ if(!L.length){$("out").hidden=true;return}
+ S={items:[],themes:{}};
+ L.forEach(function(l){var c=classify(l),m=tone(l);S.items.push({t:l,c:c,m:m});var d=S.themes[c]||(S.themes[c]={n:0,neg:0});d.n++;if(m==="neg")d.neg++});
+ draw();$("out").hidden=false;
+}
+function draw(){
+ var tot=S.items.length,names=Object.keys(S.themes).sort(function(a,b){return S.themes[b].n-S.themes[a].n});
+ var neg=S.items.filter(function(i){return i.m==="neg"}).length;
+ var K=$("kpis");K.innerHTML="";
+ [[tot,"Tickets analyzed"],[names.length,"Themes found"],[Math.round(neg/tot*100)+"%","Negative tone"],[names[0],"Biggest theme"]].forEach(function(k){var d=h("div","kpi");d.appendChild(h("b","",k[0]));d.appendChild(h("span","",k[1]));K.appendChild(d)});
+ var T=$("themes");T.innerHTML="";
+ names.forEach(function(k){var d=S.themes[k],pct=Math.round(d.n/tot*100),np=d.n?d.neg/d.n*100:0;
+  var r=h("div","bar"),top=h("div","bt");top.appendChild(h("span","",k+" ("+d.n+")"));top.appendChild(h("span","",pct+"% of tickets"));
+  var tr=h("div","track");tr.style.width=Math.max(pct,6)+"%";var a=h("div","seg-n");a.style.width=np+"%";var b=h("div","seg-p");b.style.width=(100-np)+"%";tr.appendChild(a);tr.appendChild(b);
+  r.appendChild(top);r.appendChild(tr);r.appendChild(h("div","sub",Math.round(np)+"% negative"));T.appendChild(r)});
+ var C=$("tickets");C.innerHTML="";
+ S.items.forEach(function(i){var d=h("div","tk");d.appendChild(h("div","",i.t));var c=h("div","chips");c.appendChild(h("span","chip theme",i.c));c.appendChild(h("span","chip "+i.m,i.m==="neg"?"Negative":i.m==="pos"?"Positive":"Neutral"));d.appendChild(c);C.appendChild(d)});
+ var B=$("rice");B.innerHTML="";
+ names.forEach(function(k){var df=DEF[k]||[2,.5,2],tr=h("tr");tr.dataset.k=k;
+  var td=function(x){var e=h("td");if(typeof x==="string")e.textContent=x;else e.appendChild(x);tr.appendChild(e);return e};
+  td("").className="rk";var nm=td(k);nm.className="name";td(S.themes[k].n+"");
+  td(sel([1,2,3],df[0],"imp",String));td(sel([.5,.8,1],df[1],"conf",function(v){return Math.round(v*100)+"%"}));td(sel([1,2,3],df[2],"eff",String));
+  td("").className="score";B.appendChild(tr)});
+ B.onchange=rank;rank();
+}
+function sel(v,cur,cls,f){var s=h("select");s.className=cls;s.setAttribute("aria-label",cls);v.forEach(function(x){var o=h("option","",f(x));o.value=x;if(x===cur)o.selected=true;s.appendChild(o)});return s}
+function rank(){
+ var B=$("rice"),list=[].slice.call(B.children).map(function(tr){var k=tr.dataset.k;var sc=S.themes[k].n*(+tr.querySelector(".imp").value)*(+tr.querySelector(".conf").value)/(+tr.querySelector(".eff").value);tr.querySelector(".score").textContent=sc.toFixed(1);return{k:k,sc:sc,tr:tr}});
+ list.sort(function(a,b){return b.sc-a.sc});
+ list.forEach(function(x,i){B.appendChild(x.tr);var r=x.tr.querySelector(".rk");r.innerHTML="";r.appendChild(h("span","rank",String(i+1)))});
+ var R=$("rec");R.innerHTML="";var t=list[0],n=S.themes[t.k];
+ R.appendChild(h("p","","Fix “"+t.k+"” first. It scores "+t.sc.toFixed(1)+" and covers "+n.n+" of "+S.items.length+" tickets, "+n.neg+" of them negative."+(list[1]?" Next in line: “"+list[1].k+"”.":"")));
+ R.appendChild(h("p","sub","Before committing, read a few tickets from this theme to confirm the tags are right, and check that the fix is small enough to ship this sprint."));
+}
+function tab(n){["1","2"].forEach(function(i){$("p"+i).hidden=i!==n;$("t"+i).setAttribute("aria-selected",i===n?"true":"false")})}
+$("t1").onclick=function(){tab("1")};$("t2").onclick=function(){tab("2")};
+$("go").onclick=analyze;
+$("sample").onclick=function(){$("inp").value=SAMPLE;analyze()};
+$("clear").onclick=function(){$("inp").value="";analyze()};
+$("inp").value=SAMPLE;analyze();
+</script>
+</body>
+</html>
